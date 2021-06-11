@@ -1,0 +1,8 @@
+(library
+ (name colis_constraints_efficient)
+ (public_name colis-constraints.efficient)
+ (libraries
+  yojson
+  colis-constraints.common
+  colis-constraints.efficient.clause)
+ (preprocess (pps ppx_deriving.std ppx_deriving_yojson)))

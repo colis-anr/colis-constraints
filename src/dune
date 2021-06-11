@@ -1,0 +1,7 @@
+(library
+ (name colis_constraints)
+ (public_name colis-constraints)
+ (libraries
+  colis-constraints.common
+  colis-constraints.efficient
+  colis-constraints.naive))
