@@ -80,9 +80,23 @@ module Info = struct
 
   let remove_all_feats info = { info with feats = Feat.Map.empty }
 
+  (** {3 Fences} *)
+
   let has_fen info = info.fen
 
   let set_fen info = { info with fen = true }
+
+  let get_fen info =
+    if not (has_fen info) then
+      None
+    else
+      Some
+        (fold_feats
+           (fun f _ fs -> Feat.Set.add f fs)
+           Feat.Set.empty
+           info)
+
+  (** {3 Similarities} *)
 
   let iter_sims f info =
     List.iter (fun (fs, z) -> f fs z) info.sims
@@ -94,6 +108,9 @@ module Info = struct
 
   (** {3 ¬ Fences} *)
 
+  let iter_nfens fun_ info =
+    List.iter (fun fs -> fun_ fs) info.nfens
+
   let remove_nfens info =
     { info with nfens = [] }
 
@@ -102,6 +119,9 @@ module Info = struct
       not_implemented "nfens"
 
   (** {3 ¬ Similarities} *)
+
+  let iter_nsims fun_ info =
+    List.iter (fun (fs, z) -> fun_ fs z) info.nsims
 
   let not_implemented_nsims info =
     if info.nsims <> [] then
@@ -451,3 +471,68 @@ let simplify c =
                   info.nsims })
   in
   { globals ; info }
+
+let to_literals c =
+  let literals = ref Seq.empty in
+  let add_literal literal =
+    literals := fun () -> Seq.Cons (literal, !literals)
+  in
+
+  let open Colis_constraints_common in
+  let open Atom in let open Literal in
+
+  let var =
+    let vars = Hashtbl.create 8 in
+    fun x ->
+      match Hashtbl.find_opt vars x with
+      | Some y -> y
+      | None ->
+        let y =
+          match externalise x c with
+          | y :: _ -> y
+          | _ -> Var.fresh ()
+        in
+        Hashtbl.add vars x y;
+        y
+  in
+
+  (* FIXME: unfold maybes *)
+
+  iter_infos
+    (fun x info_x ->
+       Info.iter_feats
+         (fun f -> function
+            | DontKnow -> () (* only matter for fens *)
+            | Absent -> add_literal (Pos (Abs (var x, f)))
+            | Present y -> add_literal (Pos (Feat (var x, f, var y)))
+            | Maybe _ys -> add_literal (Pos (Abs (var x, f))) (* FIXME *)
+         )
+         info_x;
+
+       let () =
+         match Info.get_fen info_x with
+         | None -> ()
+         | Some fs -> add_literal (Pos (Fen (var x, fs)))
+       in
+
+       Info.iter_sims
+         (fun fs y -> add_literal (Pos (Sim (var x, fs, var y))))
+         info_x;
+
+       (* nfeats & nabs do not exist *)
+
+       Info.iter_nfens
+         (fun fs -> add_literal (Neg (Fen (var x, fs))))
+         info_x;
+
+       Info.iter_nsims
+         (fun fs y -> add_literal (Neg (Sim (var x, fs, var y))))
+         info_x
+    )
+    c;
+
+  iter_equalities
+    (fun x y -> add_literal (Pos (Eq (var x, var y))))
+    c;
+
+  !literals

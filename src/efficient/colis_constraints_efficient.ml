@@ -2,6 +2,9 @@ open Colis_constraints_common
 open Colis_constraints_efficient_clause
 include External
 
+type var = Var.t
+type feat = Feat.t
+
 type sat_conj = Core.t                                       [@@deriving yojson]
 let true_sat_conj = Core.empty
 
@@ -13,13 +16,12 @@ let true_ = Dnf.single
 
 let  sim1 x f y = sim x (Feat.Set.singleton f) y
 
-let quantify_over x c =
-  Core.quantify_over x c |> Dnf.single
-
 let simplify = Core.simplify
 
+let quantify_over = Core.quantify_over
+
 let quantify_over_and_simplify x c =
-  Core.(c |> quantify_over x |> simplify) |> Dnf.single
+  Core.(c |> quantify_over x |> simplify)
 
 let with_shadow_variables = Core.with_shadow_variables
 
@@ -53,3 +55,5 @@ let or_ r1 r2 = fun c ->
 let or_l = function
   | [] -> fun _ -> []
   | r :: rs -> List.fold_left or_ r rs
+
+let sat_conj_to_literals = Core.to_literals

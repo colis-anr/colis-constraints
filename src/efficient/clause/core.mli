@@ -148,3 +148,5 @@ val with_shadow_variables : (unit -> 'a) -> 'a
 val not_implemented : string -> 'a
 
 val pp_debug : Format.formatter -> t -> unit
+
+val to_literals : t -> Colis_constraints_common.Literal.t Seq.t

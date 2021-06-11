@@ -28,7 +28,7 @@ let match_atom (pa : atom) (a : Atom.t) : Assign.t option list =
 
 let match_atom pa a : Assign.t Seq.t =
   match_atom pa a
-  |> Seq.from_list
+  |> List.to_seq
   |> Seq.filter_map (fun x -> x)
 
 type literal =
@@ -45,7 +45,7 @@ let rec match_literal_l pl ls =
   match ls with
   | [] -> Seq.empty
   | l :: ls ->
-     Seq.concat
+     Seq.append
        (Seq.map (fun a -> (a, ls)) (match_literal pl l))
        (Seq.map (fun (a, ls) -> (a, l::ls)) (match_literal_l pl ls))
 
