@@ -4,6 +4,7 @@ include External
 
 type var = Var.t
 type feat = Feat.t
+type feat_set = Feat.Set.t
 
 type sat_conj = Core.t                                       [@@deriving yojson]
 let true_sat_conj = Core.empty
