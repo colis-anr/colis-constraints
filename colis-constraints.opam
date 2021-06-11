@@ -8,14 +8,15 @@ license: "GPL-3.0-or-later"
 homepage: "https://github.com/colis-anr/constraints"
 bug-reports: "https://github.com/colis-anr/constraints/issues"
 depends: [
-  "dune" {>= "2.5"}
+  "dune" {>= "2.8"}
   "batteries"
   "yojson"
   "ppx_deriving_yojson"
   "ppx_deriving" {build}
+  "odoc" {with-doc}
 ]
 build: [
-  ["dune" "subst"] {pinned}
+  ["dune" "subst"] {dev}
   [
     "dune"
     "build"

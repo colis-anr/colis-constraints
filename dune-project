@@ -1,4 +1,4 @@
-(lang dune 2.5)
+(lang dune 2.8)
 
 (name colis-constraints)
 (source (github colis-anr/constraints))
@@ -20,4 +20,5 @@
   batteries
   yojson
   ppx_deriving_yojson
-  (ppx_deriving :build)))
+  (ppx_deriving :build)
+  (odoc :with-doc)))
