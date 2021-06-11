@@ -1,3 +1,4 @@
+open Batteries
 open Colis_constraints_common
 
 exception NotImplemented of string
@@ -484,7 +485,7 @@ let to_literals c =
   let var =
     let vars = Hashtbl.create 8 in
     fun x ->
-      match Hashtbl.find_opt vars x with
+      match Hashtbl.find_option vars x with
       | Some y -> y
       | None ->
         let y =

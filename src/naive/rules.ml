@@ -1,3 +1,4 @@
+open Batteries
 open Colis_constraints_common open Atom open Literal
 
 let accessibility c =
@@ -31,7 +32,7 @@ let accessibility c =
           raise (Invalid_argument "accessibility");
         (* We add the [y]s to the result: they lead to [x]. *)
         let ys =
-          match Hashtbl.find_opt res x with
+          match Hashtbl.find_option res x with
           | None -> ys
           | Some zs -> Var.Set.union ys zs
         in

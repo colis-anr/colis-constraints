@@ -1,3 +1,4 @@
+open Batteries
 open Colis_constraints_common
 
 type atom =
@@ -28,7 +29,7 @@ let match_atom (pa : atom) (a : Atom.t) : Assign.t option list =
 
 let match_atom pa a : Assign.t Seq.t =
   match_atom pa a
-  |> List.to_seq
+  |> Seq.of_list
   |> Seq.filter_map (fun x -> x)
 
 type literal =
