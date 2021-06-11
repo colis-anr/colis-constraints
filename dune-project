@@ -14,6 +14,8 @@
 (package
  (name colis-constraints)
  (version 0.1)
+ (synopsis "Constraints backend for the CoLiS Symbolic Interpreter")
+
  (depends
   batteries
   yojson
