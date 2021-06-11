@@ -116,3 +116,20 @@ let similar r r' cwd q z z' =
   with_internal_2 r r' @@ fun r r' ->
   with_internal_2 z z' @@ fun z z' ->
   similar r r' Colis_constraints_common.Path.(normalize ~cwd q) z z'
+
+let literal =
+  let open Colis_constraints_common in
+  let open Atom in let open Literal in
+  function
+  | Pos (Eq (x, y)) -> eq x y
+  | Pos (Feat (x, f, y)) -> feat x f y
+  | Pos (Abs (x, f)) -> abs x f
+  | Pos (Kind (x, k)) -> kind x k
+  | Pos (Fen (x, fs)) -> fen x fs
+  | Pos (Sim (x, fs, y)) -> sim x fs y
+  | Neg (Eq (x, y)) -> neq x y
+  | Neg (Feat (x, f, y)) -> nfeat x f y
+  | Neg (Abs (x, f)) -> nabs x f
+  | Neg (Kind (x, k)) -> nkind x k
+  | Neg (Fen (x, fs)) -> nfen x fs
+  | Neg (Sim (x, fs, y)) -> nsim x fs y
