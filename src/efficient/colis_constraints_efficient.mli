@@ -1,6 +1,5 @@
 open Batteries
 open Colis_constraints_common
-open Colis_constraints_efficient_clause
 
 (** {2 Base Types} *)
 

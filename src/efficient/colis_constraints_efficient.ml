@@ -1,5 +1,4 @@
 open Colis_constraints_common
-open Colis_constraints_efficient_clause
 include External
 
 type var = Var.t

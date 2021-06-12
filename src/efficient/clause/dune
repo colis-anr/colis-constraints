@@ -1,7 +1,0 @@
-(library
- (name colis_constraints_efficient_clause)
- (public_name colis-constraints.efficient.clause)
- (libraries
-  yojson
-  colis-constraints.common)
- (preprocess (pps ppx_deriving_yojson)))
