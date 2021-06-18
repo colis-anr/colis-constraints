@@ -476,7 +476,8 @@ let simplify c =
 let to_literals c =
   let literals = ref Seq.empty in
   let add_literal literal =
-    literals := fun () -> Seq.Cons (literal, !literals)
+    let v_literals = !literals in
+    literals := fun () -> Seq.Cons (literal, v_literals)
   in
 
   let open Colis_constraints_common in
