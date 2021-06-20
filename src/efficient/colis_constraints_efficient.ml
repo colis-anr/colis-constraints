@@ -19,10 +19,10 @@ let with_shadow_variables = Core.with_shadow_variables
 let add_to_sat_conj constr sat_conj =
   constr
   |> to_disj
-  |> Disj.to_list
+  |> DXC.to_list
   |> List.concat_map
     (fun conj ->
-       Conj.literals conj
+       XConstraint.literals conj
        |> Seq.fold_left
          (fun sat_conj_list lit ->
             List.concat_map (External.literal lit) sat_conj_list)

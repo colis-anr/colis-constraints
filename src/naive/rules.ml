@@ -71,13 +71,13 @@ let (fs, gs) = Metavar.fresh2 ()
 let (k, l) = Metavar.fresh2 ()
 
 let c_cycle conj =
-  try ignore (accessibility (Conj.literals_set conj)); None
-  with Invalid_argument _ -> Some Disj.false_
+  try ignore (accessibility (XConstraint.literals_set conj)); None
+  with Invalid_argument _ -> Some DXC.false_
 
 let make ~pat ?pred ~prod () =
   fun conj ->
-  (* let es = Conj.quantified_variables_set conj in
-   * let conj = Conj.literals conj in *)
+  (* let es = XConstraint.quantified_variables_set conj in
+   * let conj = XConstraint.literals conj in *)
   Pattern.find_all ?pred pat conj
   |> Seq.filter_map
     (fun (a, conj') ->
@@ -85,19 +85,19 @@ let make ~pat ?pred ~prod () =
           sometimes, this conjunction might be equal to the given
           one. In this case, we have to keep looking for an other
           production rule that might be better. *)
-       match Disj.to_list (prod a conj') with
-       | [] -> Some Disj.false_
-       | [conj'] when Conj.equal conj' conj -> None
-       | [conj'] -> Some (Disj.singleton conj')
+       match DXC.to_list (prod a conj') with
+       | [] -> Some DXC.false_
+       | [conj'] when XConstraint.equal conj' conj -> None
+       | [conj'] -> Some (DXC.singleton conj')
        | disj' ->
-         assert (List.for_all (fun conj' -> not (Conj.equal conj' conj)) disj');
-         Some (Disj.from_list disj'))
+         assert (List.for_all (fun conj' -> not (XConstraint.equal conj' conj)) disj');
+         Some (DXC.from_list disj'))
   |> (fun seq -> seq ())
   |> function
   | Nil -> None
   | Cons (x, _) -> Some x
 
-let clash _ _ = Disj.false_
+let clash _ _ = DXC.false_
 
 let c_feat_abs =
   make
@@ -150,40 +150,40 @@ let s_eq_glob =
           | _ -> assert false
         in
         conj
-        |> Conj.set_literals
-          (Pos (Eq (x, y)) & replace_in_literals ~var:x ~by:y (Conj.literals conj))
-        |> Disj.singleton)
+        |> XConstraint.set_literals
+          (Pos (Eq (x, y)) & replace_in_literals ~var:x ~by:y (XConstraint.literals conj))
+        |> DXC.singleton)
     ()
 
 let s_eq =
   make
     ~pat:[Pos (Eq (x, y))]
     ~pred:(fun a conj ->
-        Var.Set.mem (Assign.var a x) (Conj.quantified_variables_set conj)
+        Var.Set.mem (Assign.var a x) (XConstraint.quantified_variables_set conj)
         && not (Var.equal (Assign.var a x) (Assign.var a y)))
     ~prod:(fun a conj ->
         let x = Assign.var a x in
         let y = Assign.var a y in
         conj
-        |> Conj.unquantify x
-        |> Conj.set_literals
+        |> XConstraint.unquantify x
+        |> XConstraint.set_literals
           (conj
-           |> Conj.literals
+           |> XConstraint.literals
            |> replace_in_literals ~var:x ~by:y)
-        |> Disj.singleton)
+        |> DXC.singleton)
     ()
 
 let s_eq_refl =
   make
     ~pat:[Pos (Eq (x, x))]
-    ~prod:(fun _ conj -> Disj.singleton conj)
+    ~prod:(fun _ conj -> DXC.singleton conj)
     ()
 
 let s_feats =
   make
     ~pat:[Pos (Feat (x, f, y)); Pos (Feat (x, f, z))]
     ~pred:(fun a conj ->
-        Conj.is_quantified (Assign.var a z) conj
+        XConstraint.is_quantified (Assign.var a z) conj
         && not (Var.equal (Assign.var a y) (Assign.var a z)))
     ~prod:(fun a conj ->
         let x = Assign.var a x in
@@ -191,31 +191,31 @@ let s_feats =
         let z = Assign.var a z in
         let f = Assign.feat a f in
         conj
-        |> Conj.unquantify z
-        |> Conj.set_literals
+        |> XConstraint.unquantify z
+        |> XConstraint.set_literals
           (conj
-           |> Conj.literals
+           |> XConstraint.literals
            |> replace_in_literals ~var:z ~by:y
            |> (&) (Pos (Feat (x, f, y))))
-        |> Disj.singleton)
+        |> DXC.singleton)
     ()
 
 let s_feats_glob =
   make
     ~pat:[Pos (Feat (x, f, y)); Pos (Feat (x, f, z))]
     ~pred:(fun a conj ->
-      not (Conj.is_quantified (Assign.var a y) conj)
-      && not (Conj.is_quantified (Assign.var a z) conj))
+      not (XConstraint.is_quantified (Assign.var a y) conj)
+      && not (XConstraint.is_quantified (Assign.var a z) conj))
     ~prod:(fun a conj ->
       let x = Assign.var a x in
       let y = Assign.var a y in
       let z = Assign.var a z in
       let f = Assign.feat a f in
       conj
-      |> Conj.add_literals_list
+      |> XConstraint.add_literals_list
         [ Pos (Eq (y, z)) ;
           Pos (Feat (x, f, y)) ]
-      |> Disj.singleton)
+      |> DXC.singleton)
     ()
 
 let s_sims =
@@ -226,8 +226,8 @@ let s_sims =
         let y = Assign.var a y in
         let hs = Feat.Set.inter (Assign.feat_set a fs) (Assign.feat_set a gs) in
         conj
-        |> Conj.add_literal (Pos (Sim (x, hs, y)))
-        |> Disj.singleton)
+        |> XConstraint.add_literal (Pos (Sim (x, hs, y)))
+        |> DXC.singleton)
     ()
 
 let p_feat =
@@ -241,11 +241,11 @@ let p_feat =
         let f = Assign.feat a f in
         let fs = Assign.feat_set a fs in
         conj
-        |> Conj.add_literals_list
+        |> XConstraint.add_literals_list
           [Pos (Sim (x, fs, y));
            Pos (Feat (x, f, z));
            Pos (Feat (y, f, z))]
-        |> Disj.singleton)
+        |> DXC.singleton)
     ()
 
 let p_abs =
@@ -258,11 +258,11 @@ let p_abs =
         let f = Assign.feat a f in
         let fs = Assign.feat_set a fs in
         conj
-        |> Conj.add_literals_list
+        |> XConstraint.add_literals_list
           [Pos (Sim (x, fs, y));
            Pos (Abs (x, f));
            Pos (Abs (y, f))]
-        |> Disj.singleton)
+        |> DXC.singleton)
     ()
 
 let p_fen =
@@ -274,11 +274,11 @@ let p_fen =
         let fs = Assign.feat_set a fs in
         let gs = Assign.feat_set a gs in
         conj
-        |> Conj.add_literals_list
+        |> XConstraint.add_literals_list
           [Pos (Sim (x, fs, y));
            Pos (Fen (x, gs));
            Pos (Fen (y, Feat.Set.union fs gs))]
-        |> Disj.singleton)
+        |> DXC.singleton)
     ()
 
 let p_sim =
@@ -301,7 +301,7 @@ let p_sim =
                  )
                | _ -> hs)
             None
-            (Conj.literals conj)
+            (XConstraint.literals conj)
         in
         match hs with
         | None -> true
@@ -314,11 +314,11 @@ let p_sim =
         let gs = Assign.feat_set a gs in
         let fgs = Feat.Set.union fs gs in
         conj
-        |> Conj.add_literals_list
+        |> XConstraint.add_literals_list
           [ Pos (Sim (x, fs, y));
             Pos (Sim (x, gs, z));
             Pos (Sim (y, fgs, z)) ]
-        |> Disj.singleton)
+        |> DXC.singleton)
     ()
 
 let r_neq =
@@ -328,9 +328,9 @@ let r_neq =
         let x = Assign.var a x in
         let y = Assign.var a y in
         conj
-        |> Conj.add_literal
+        |> XConstraint.add_literal
           (Neg (Sim (x, Feat.Set.empty, y)))
-        |> Disj.singleton)
+        |> DXC.singleton)
     ()
 
 let r_nfeat =
@@ -340,12 +340,12 @@ let r_nfeat =
         let x = Assign.var a x in
         let y = Assign.var a y in
         let f = Assign.feat a f in
-        Disj.two
-          (Conj.add_literal (Pos (Abs (x, f))) conj)
+        DXC.two
+          (XConstraint.add_literal (Pos (Abs (x, f))) conj)
           (let z = Var.fresh () in
            conj
-           |> Conj.quantify z
-           |> Conj.add_literals_list
+           |> XConstraint.quantify z
+           |> XConstraint.add_literals_list
              [ Pos (Feat (x, f, z));
                Neg (Sim (y, Feat.Set.empty, z)) ])
       )
@@ -361,8 +361,8 @@ let r_nkind =
         |> List.filter ((<>) k)
         |> List.map
           (fun k ->
-             Conj.add_literal (Pos (Kind (x, k))) conj)
-        |> Disj.from_list
+             XConstraint.add_literal (Pos (Kind (x, k))) conj)
+        |> DXC.from_list
       )
     ()
 
@@ -374,9 +374,9 @@ let r_nabs =
         let f = Assign.feat a f in
         let z = Var.fresh () in
         conj
-        |> Conj.quantify z
-        |> Conj.add_literal (Pos (Feat (x, f, z)))
-        |> Disj.singleton)
+        |> XConstraint.quantify z
+        |> XConstraint.add_literal (Pos (Feat (x, f, z)))
+        |> DXC.singleton)
     ()
 
 let one_feature_in x fs conj =
@@ -385,9 +385,9 @@ let one_feature_in x fs conj =
     (fun f ->
        let z = Var.fresh () in
        conj
-       |> Conj.quantify z
-       |> Conj.add_literal (Pos (Feat (x, f, z))))
-  |> Disj.from_list
+       |> XConstraint.quantify z
+       |> XConstraint.add_literal (Pos (Feat (x, f, z))))
+  |> DXC.from_list
 
 let one_difference_in x y fs conj =
   let difference_in x y f es c =
@@ -401,11 +401,11 @@ let one_difference_in x y fs conj =
   |> List.map
     (fun f ->
        difference_in x y f
-         (Conj.quantified_variables_set conj)
-         (Conj.literals conj))
+         (XConstraint.quantified_variables_set conj)
+         (XConstraint.literals conj))
   |> List.flatten
-  |> List.map (fun (es, c) -> Conj.from_sets es (Literal.Set.of_seq c))
-  |> Disj.from_list
+  |> List.map (fun (es, c) -> XConstraint.from_sets es (Literal.Set.of_seq c))
+  |> DXC.from_list
 
 let r_nfen_fen =
   make
@@ -416,7 +416,7 @@ let r_nfen_fen =
         let gs = Assign.feat_set a gs in
         one_feature_in
           x (Feat.Set.diff fs gs)
-          (Conj.add_literal (Pos (Fen (x, fs))) conj))
+          (XConstraint.add_literal (Pos (Fen (x, fs))) conj))
     ()
 
 let r_nsim_sim =
@@ -429,7 +429,7 @@ let r_nsim_sim =
         let gs = Assign.feat_set a gs in
         one_difference_in
           x y (Feat.Set.diff fs gs)
-          (Conj.add_literal (Pos (Sim (x, fs, y))) conj))
+          (XConstraint.add_literal (Pos (Sim (x, fs, y))) conj))
     ()
 
 let r_nsim_fen =
@@ -440,11 +440,11 @@ let r_nsim_fen =
         let y = Assign.var a y in
         let fs = Assign.feat_set a fs in
         let gs = Assign.feat_set a gs in
-        let conj = Conj.add_literal (Pos (Fen (x, fs))) conj in
-        Disj.or_
+        let conj = XConstraint.add_literal (Pos (Fen (x, fs))) conj in
+        DXC.or_
           (conj
-           |> Conj.add_literal (Neg (Fen (y, Feat.Set.union fs gs)))
-           |> Disj.singleton)
+           |> XConstraint.add_literal (Neg (Fen (y, Feat.Set.union fs gs)))
+           |> DXC.singleton)
           (one_difference_in x y (Feat.Set.diff fs gs) conj))
     ()
 
@@ -457,11 +457,11 @@ let e_nfen =
         let y = Assign.var a y in
         let fs = Assign.feat_set a fs in
         let gs = Assign.feat_set a gs in
-        let conj = Conj.add_literal (Pos (Sim (x, fs, y))) conj in
-        Disj.or_
+        let conj = XConstraint.add_literal (Pos (Sim (x, fs, y))) conj in
+        DXC.or_
           (conj
-           |> Conj.add_literal (Neg (Fen (x, Feat.Set.union fs gs)))
-           |> Disj.singleton)
+           |> XConstraint.add_literal (Neg (Fen (x, Feat.Set.union fs gs)))
+           |> DXC.singleton)
           (one_feature_in x (Feat.Set.diff fs gs) conj))
     ()
 
@@ -475,11 +475,11 @@ let e_nsim =
         let z = Assign.var a z in
         let fs = Assign.feat_set a fs in
         let gs = Assign.feat_set a gs in
-        let conj = Conj.add_literal (Pos (Sim (x, fs, y))) conj in
-        Disj.or_
+        let conj = XConstraint.add_literal (Pos (Sim (x, fs, y))) conj in
+        DXC.or_
           (conj
-           |> Conj.add_literal (Neg (Sim (x, Feat.Set.union fs gs, z)))
-           |> Disj.singleton)
+           |> XConstraint.add_literal (Neg (Sim (x, Feat.Set.union fs gs, z)))
+           |> DXC.singleton)
           (one_difference_in x z (Feat.Set.diff fs gs) conj))
     ()
 
@@ -493,11 +493,11 @@ let p_nfen =
         let fs = Assign.feat_set a fs in
         let gs = Assign.feat_set a gs in
         conj
-        |> Conj.add_literals_list
+        |> XConstraint.add_literals_list
           [ Pos (Sim (x, fs, y));
             Neg (Fen (x, gs));
             Neg (Fen (y, gs)) ]
-        |> Disj.singleton)
+        |> DXC.singleton)
     ()
 
 let p_nsim =
@@ -511,11 +511,11 @@ let p_nsim =
         let fs = Assign.feat_set a fs in
         let gs = Assign.feat_set a gs in
         conj
-        |> Conj.add_literals_list
+        |> XConstraint.add_literals_list
           [ Pos (Sim (x, fs, y));
             Neg (Sim (x, gs, z));
             Neg (Sim (y, gs, z)) ]
-        |> Disj.singleton)
+        |> DXC.singleton)
     ()
 
 let s_kind =
@@ -526,10 +526,10 @@ let s_kind =
         let x = Assign.var a x in
         let k = Assign.kind a k in
         conj
-        |> Conj.add_literals_list
+        |> XConstraint.add_literals_list
           [ Pos (Fen (x, Feat.Set.empty));
             Pos (Kind (x, k))]
-        |> Disj.singleton)
+        |> DXC.singleton)
     ()
 
 (* ========================================================================== *)

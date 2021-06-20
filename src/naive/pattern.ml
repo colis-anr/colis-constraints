@@ -65,9 +65,9 @@ let rec match_ pls ls =
                     (fun a -> Some (a, ls2))))
 
 let find_all ?(pred=(fun _ _ -> true)) pls conj =
-  match_ pls (Conj.literals_list conj)
+  match_ pls (XConstraint.literals_list conj)
   |> Seq.filter_map (fun (a, ls) ->
-      let conj = Conj.(from_sets (quantified_variables_set conj) ls) in
+      let conj = XConstraint.(from_sets (quantified_variables_set conj) ls) in
       if pred a conj then
         Some (a, conj)
       else

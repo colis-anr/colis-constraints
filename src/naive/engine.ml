@@ -8,7 +8,7 @@ let apply_rule_on_disj (name, rule) disj =
   let applied = ref false in
   let apply_rule_on_conj rule conj =
     match rule conj with
-    | None -> Disj.singleton conj
+    | None -> DXC.singleton conj
     | Some disj' ->
       if not !applied then
         (
@@ -17,7 +17,7 @@ let apply_rule_on_disj (name, rule) disj =
         );
       disj'
   in
-  let disj' = Disj.concat_map (apply_rule_on_conj rule) disj in
+  let disj' = DXC.concat_map (apply_rule_on_conj rule) disj in
   if !applied then Some disj' else None
 
 let rec apply_rules_on_disj rules disj =
@@ -41,7 +41,7 @@ let remove_literals_about_in_literal_set xs =
   Literal.Set.filter (fun l -> not (is_literal_about xs l))
 
 let rec normalize limit d =
-  Log.debug (fun m -> m "%a" Disj.pp d);
+  Log.debug (fun m -> m "%a" DXC.pp d);
   assert (limit >= 0);
   match apply_rules_on_disj Rules.all d with
   | None ->
@@ -49,21 +49,21 @@ let rec normalize limit d =
   | Some d ->
      normalize (limit-1) d
 
-let normalize ?(limit=50) (disj : Disj.t) : Disj.t =
+let normalize ?(limit=50) (disj : DXC.t) : DXC.t =
   Log.debug (fun m -> m "Normalizing");
   let disj' = normalize limit disj in
   Log.debug (fun m -> m "Normal form reached.");
   disj'
 
-let simplify (disj : Disj.t) : Disj.t =
+let simplify (disj : DXC.t) : DXC.t =
   Log.debug (fun m -> m "Simplifying");
   Limits.check_cpu_time_limit ();
   Limits.check_memory_limit ();
   let disj' =
-    Disj.map
+    DXC.map
       (fun conj ->
-         let es = Conj.quantified_variables_set conj in
-         let c = Conj.literals_set conj in
+         let es = XConstraint.quantified_variables_set conj in
+         let c = XConstraint.literals_set conj in
          let xs =
            Rules.accessibility c
            |> List.filter (fun (x, ys) ->
@@ -71,14 +71,14 @@ let simplify (disj : Disj.t) : Disj.t =
            |> List.map (fun (x, _) -> x)
            |> Var.Set.of_list
          in
-         Conj.from_sets
+         XConstraint.from_sets
            (Var.Set.diff es xs)
            (remove_literals_about_in_literal_set xs c))
       disj
   in
-  Log.debug (fun m -> m "%a" Disj.pp disj');
-  Disj.to_seq disj'
+  Log.debug (fun m -> m "%a" DXC.pp disj');
+  DXC.to_seq disj'
   |> Seq.iter
     (fun conj' ->
-       Log.debug (fun m -> m "%a" (Conj.pp_as_dot ~name:"sdlkfj") conj'));
+       Log.debug (fun m -> m "%a" (XConstraint.pp_as_dot ~name:"sdlkfj") conj'));
   disj'

@@ -9,11 +9,11 @@ module Rules = Rules
 let quantify_over x conj =
   let x' = Var.fresh () in
   conj
-  |> Conj.quantify x'
-  |> Conj.set_literals
-    (Conj.literals conj
+  |> XConstraint.quantify x'
+  |> XConstraint.set_literals
+    (XConstraint.literals conj
      |> Rules.replace_in_literals ~var:x ~by:x')
-  |> Disj.singleton
+  |> DXC.singleton
   |> Engine.normalize
 
 let quantify_over_and_simplify x conj =

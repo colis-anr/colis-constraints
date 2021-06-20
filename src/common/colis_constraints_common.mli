@@ -104,7 +104,7 @@ val exists9 : (Var.t -> Var.t -> Var.t -> Var.t -> Var.t -> Var.t -> Var.t -> Va
 
 (** {2 Working with Constraints} *)
 
-val to_disj : t -> Disj.t
+val to_disj : t -> DXC.t
 (** For internal use only. *)
 
 (** {2 Submodules} *)
@@ -114,13 +114,24 @@ val to_disj : t -> Disj.t
 module Feat = Feat
 module Kind = Kind
 module Var = Var
+
+(** {3 Formulas}
+
+    Various classes of formulas. The various names are taken from Nicolas
+    Jeannerod's Ph.D. Thesis: “Verification of Shell Scripts Performing File
+    Hierarchy Transformations”. *)
+
 module Atom = Atom
+(** Atomic formulas, aka predicates. *)
+
 module Literal = Literal
+(** Literals: atom and negated atoms. *)
 
-(** {3 Formulae} *)
+module XConstraint = XConstraint
+(** X-Constraints: existentially quantified conjunctions of literals. *)
 
-module Conj = Conj
-module Disj = Disj
+module DXC = DXC
+(** Disjunctions of x-constraints. *)
 
 (** {3 Misc} *)
 

@@ -14,6 +14,6 @@ type literal =
   | Neg of atom
 
 val find_all :
-  ?pred:(Assign.t -> Conj.t -> bool) ->
-  literal list -> Conj.t ->
-  (Assign.t * Conj.t) Seq.t
+  ?pred:(Assign.t -> XConstraint.t -> bool) ->
+  literal list -> XConstraint.t ->
+  (Assign.t * XConstraint.t) Seq.t

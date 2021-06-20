@@ -2,22 +2,22 @@
 
 (** {2 Constraints} *)
 
-type t = Disj.t
+type t = DXC.t
 
 let to_disj = fun x -> x
 
-let true_ = Disj.singleton Conj.true_
-let false_ = Disj.false_
+let true_ = DXC.singleton XConstraint.true_
+let false_ = DXC.false_
 
-let and_ = Disj.and_
+let and_ = DXC.and_
 let (&) = and_
-let and_l = Disj.and_l
+let and_l = DXC.and_l
 
-let or_ = Disj.or_
-let or_l = Disj.or_l
+let or_ = DXC.or_
+let or_l = DXC.or_l
 
 let literal lit =
-  Disj.singleton Conj.(add_literal lit true_)
+  DXC.singleton XConstraint.(add_literal lit true_)
 
 let eq x y = literal (Literal.Pos (Atom.Eq (x, y)))
 let neq x y = literal (Literal.Neg (Atom.Eq (x, y)))
@@ -52,7 +52,7 @@ let nsymlink x = nkind x Kind.Symlink
 let exists f =
   let x = Var.fresh () in
   let d = f x in
-  Disj.quantify x d
+  DXC.quantify x d
 
 let exists2 f = exists  @@ fun x1 -> exists @@ fun x2 -> f x1 x2
 let exists3 f = exists2 @@ fun x1 x2 -> exists @@ fun x3 -> f x1 x2 x3
@@ -129,20 +129,14 @@ let similar r r' cwd q z z' =
 
 (** {2 Submodules} *)
 
-(** {3 Basic Constraint Objects} *)
-
 module Feat = Feat
 module Kind = Kind
 module Var = Var
+
 module Atom = Atom
 module Literal = Literal
-
-(** {3 Formulae} *)
-
-module Conj = Conj
-module Disj = Disj
-
-(** {3 Misc} *)
+module XConstraint = XConstraint
+module DXC = DXC
 
 module Log = Log
 module Path = Path

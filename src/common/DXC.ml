@@ -1,10 +1,10 @@
-type t = Conj.t list
+type t = XConstraint.t list
 [@@deriving show { with_path = false }]
 (* FIXME: abstract *)
 
 let pp fmt = function
   | [] -> Format.pp_print_string fmt "⊥"
-  | [conj] -> Conj.pp fmt conj
+  | [conj] -> XConstraint.pp fmt conj
   | disj -> pp fmt disj (* FIXME *)
 
 let false_ = []
@@ -14,7 +14,7 @@ let one = singleton
 let two c1 c2 = [c1; c2]
 
 let and_ d1 d2 =
-  List.map (fun c1 -> List.map (Conj.and_ c1) d2) d1
+  List.map (fun c1 -> List.map (XConstraint.and_ c1) d2) d1
   |> List.flatten
 
 let and_l = function
@@ -24,7 +24,7 @@ let and_l = function
 let or_ = (@)
 let or_l = List.flatten
 
-let quantify x d = List.map (Conj.quantify x) d
+let quantify x d = List.map (XConstraint.quantify x) d
 
 let to_seq = List.to_seq
 let to_list = fun x -> x
