@@ -507,7 +507,11 @@ let to_literals c =
             | DontKnow -> () (* only matter for fens *)
             | Absent -> add_literal (Pos (Abs (var x, f)))
             | Present y -> add_literal (Pos (Feat (var x, f, var y)))
-            | Maybe _ys -> add_literal (Pos (Abs (var x, f))) (* FIXME *)
+            | Maybe ys ->
+              List.iter
+                (fun y ->
+                   add_literal (Pos (Maybe (var x, f, var y))))
+                ys
          )
          info_x;
 

@@ -146,3 +146,4 @@ module Derivable = Derivable
 module Limits = Limits
 
 module ExtList = ExtList
+module ExtSeq = ExtSeq

@@ -17,7 +17,7 @@
  (synopsis "Constraints backend for the CoLiS Symbolic Interpreter")
 
  (depends
-  batteries
+  (batteries (>= 3.3.0))
   yojson
   ppx_deriving_yojson
   (ppx_deriving :build)

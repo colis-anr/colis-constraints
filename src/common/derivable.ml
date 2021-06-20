@@ -1,3 +1,5 @@
+open Batteries
+
 module type OrderedType = sig
   type t
   [@@deriving yojson]
@@ -21,7 +23,7 @@ module type SetS = sig
   val pp : Format.formatter -> t -> unit
 
   val to_yojson : t -> Yojson.Safe.t
-  val of_yojson : Yojson.Safe.t -> (t, string) Result.result
+  val of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
 end
 
 module MakeSet (Ord : OrderedType) = struct
@@ -61,7 +63,7 @@ module type MapS = sig
   (* FIXME: for < 4.06 compatibility *)
 
   val to_yojson : ('a -> Yojson.Safe.t) -> 'a t -> Yojson.Safe.t
-  val of_yojson : (Yojson.Safe.t -> ('a, string) Result.result) -> Yojson.Safe.t -> ('a t, string) Result.result
+  val of_yojson : (Yojson.Safe.t -> 'a Ppx_deriving_yojson_runtime.error_or) -> Yojson.Safe.t -> 'a t Ppx_deriving_yojson_runtime.error_or
 end
 
 module MakeMap (Ord : OrderedType) = struct

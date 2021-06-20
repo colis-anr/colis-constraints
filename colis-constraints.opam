@@ -9,7 +9,7 @@ homepage: "https://github.com/colis-anr/constraints"
 bug-reports: "https://github.com/colis-anr/constraints/issues"
 depends: [
   "dune" {>= "2.8"}
-  "batteries"
+  "batteries" {>= "3.3.0"}
   "yojson"
   "ppx_deriving_yojson"
   "ppx_deriving" {build}

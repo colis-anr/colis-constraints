@@ -1,4 +1,4 @@
-include List
+include BatList
 
 let concat_map f l =
   let rec aux f acc = function

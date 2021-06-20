@@ -1,3 +1,4 @@
+open Batteries
 open Colis_constraints_common
 
 val accessibility : Literal.Set.t -> (Var.t * Var.Set.t) list

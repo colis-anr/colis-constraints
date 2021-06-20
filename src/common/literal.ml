@@ -23,4 +23,4 @@ module Self = struct
   let equal = equal
 end
 
-module Set = Set.Make(Self)
+module Set = BatSet.Make(Self)

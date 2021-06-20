@@ -1,3 +1,5 @@
+open Batteries
+
 type t = XConstraint.t list
 [@@deriving show { with_path = false }]
 (* FIXME: abstract *)
@@ -26,7 +28,7 @@ let or_l = List.flatten
 
 let quantify x d = List.map (XConstraint.quantify x) d
 
-let to_seq = List.to_seq
+let to_seq = Seq.of_list
 let to_list = fun x -> x
 
 let map = List.map

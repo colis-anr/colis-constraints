@@ -1,3 +1,5 @@
+open Batteries
+
 type t = Var.Set.t * Literal.Set.t
 [@@deriving eq, ord]
 
@@ -19,7 +21,7 @@ let add_literals ls' (xs, ls) =
   (xs, Literal.Set.add_seq ls' ls)
 
 let add_literals_list ls conj =
-  add_literals (List.to_seq ls) conj
+  add_literals (Seq.of_list ls) conj
 
 let set_literals ls (xs, _) =
   (xs, Literal.Set.of_seq ls)
@@ -32,7 +34,7 @@ let and_ (x1, c1) (x2, c2) =
       let mapping = Hashtbl.create 8 in (* mapping from old to fresh variables *)
       Var.Set.iter (fun x -> Hashtbl.add mapping x (Var.fresh ())) common;
       fun x ->
-        match Hashtbl.find_opt mapping x with
+        match Hashtbl.find_option mapping x with
         | None -> x
         | Some y -> y
     in
@@ -134,7 +136,7 @@ let quantified_variables conj = Var.Set.to_seq (quantified_variables_set conj)
 
 let literals_set (_, ls) = ls
 let literals conj = Literal.Set.to_seq (literals_set conj)
-let literals_list conj = List.of_seq (literals conj)
+let literals_list conj = ExtSeq.to_list (literals conj)
 
 let from_sets xs ls = (xs, ls)
 

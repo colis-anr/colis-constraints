@@ -1,3 +1,5 @@
+open Batteries
+
 type t
 
 val true_ : t
