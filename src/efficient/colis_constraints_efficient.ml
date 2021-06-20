@@ -20,12 +20,12 @@ let add_to_sat_conj constr sat_conj =
   constr
   |> to_disj
   |> DXC.to_list
-  |> List.concat_map
+  |> ExtList.concat_map
     (fun conj ->
        XConstraint.literals conj
        |> Seq.fold_left
          (fun sat_conj_list lit ->
-            List.concat_map (External.literal lit) sat_conj_list)
+            ExtList.concat_map (External.literal lit) sat_conj_list)
          [sat_conj])
 
 let sat_conj_to_literals = Core.to_literals

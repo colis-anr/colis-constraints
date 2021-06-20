@@ -1,3 +1,13 @@
+include List
+
+let concat_map f l =
+  let rec aux f acc = function
+    | [] -> rev acc
+    | x :: l ->
+      let xs = f x in
+      aux f (rev_append xs acc) l
+  in aux f [] l
+
 let rec insert_uniq_sorted cmp e = function
   | [] -> [e]
   | h :: q ->

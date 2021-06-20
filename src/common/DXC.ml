@@ -30,6 +30,6 @@ let to_seq = List.to_seq
 let to_list = fun x -> x
 
 let map = List.map
-let concat_map = List.concat_map
+let concat_map = ExtList.concat_map
 
 let from_list = fun x -> x
