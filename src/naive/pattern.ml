@@ -64,10 +64,11 @@ let rec match_ pls ls =
                     (Assign.merge a1 a2)
                     (fun a -> Some (a, ls2))))
 
-let find_all ?(pred=(fun _ _ -> true)) pls (es, ls) =
-  match_ pls (Literal.Set.elements ls)
-  |> Seq.filter_map (fun (a, c) ->
-         if pred a (es, c) then
-           Some (a, (es, c))
-         else
-           None)
+let find_all ?(pred=(fun _ _ -> true)) pls conj =
+  match_ pls (Conj.literals_list conj)
+  |> Seq.filter_map (fun (a, ls) ->
+      let conj = Conj.(from_sets (quantified_variables_set conj) ls) in
+      if pred a conj then
+        Some (a, conj)
+      else
+        None)

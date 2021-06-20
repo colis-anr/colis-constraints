@@ -1,6 +1,47 @@
 type t = Var.Set.t * Literal.Set.t
 [@@deriving eq, ord]
 
+let true_ = (Var.Set.empty, Literal.Set.empty)
+
+let quantify x (xs, ls) =
+  (Var.Set.add x xs, ls)
+
+let unquantify x (xs, ls) =
+  (Var.Set.remove x xs, ls)
+
+let set_quantified_variables xs (_, ls) =
+  (Var.Set.of_seq xs, ls)
+
+let add_literal lit (vars, lits) =
+  (vars, Literal.Set.add lit lits)
+
+let add_literals ls' (xs, ls) =
+  (xs, Literal.Set.add_seq ls' ls)
+
+let add_literals_list ls conj =
+  add_literals (List.to_seq ls) conj
+
+let set_literals ls (xs, _) =
+  (xs, Literal.Set.of_seq ls)
+
+let and_ (x1, c1) (x2, c2) =
+  (* rewrite so that no variable in common *)
+  let (x2, c2) =
+    let rewrite_variable = (* rewriter of variables *)
+      let common = Var.Set.inter x1 x2 in (* variables in common *)
+      let mapping = Hashtbl.create 8 in (* mapping from old to fresh variables *)
+      Var.Set.iter (fun x -> Hashtbl.add mapping x (Var.fresh ())) common;
+      fun x ->
+        match Hashtbl.find_opt mapping x with
+        | None -> x
+        | Some y -> y
+    in
+    (Var.Set.map rewrite_variable x2,
+     Literal.Set.map (Literal.rewrite_variables rewrite_variable) c2)
+  in
+  assert (Var.Set.(is_empty (inter x1 x2)));
+  (Var.Set.union x1 x2, Literal.Set.union c1 c2)
+
 let fpf = Format.fprintf
 
 let pp fmt (es, c) =
@@ -40,7 +81,7 @@ let pp_as_dot ~name fmt (es, c) =
   in
 
   let is_atom_unary_about_var x = function
-    | Atom.Eq _ | Feat _ | Sim _ -> false
+    | Atom.Eq _ | Feat _ | Maybe _ | Sim _ -> false
     | Abs (y, _) | Kind (y, _) | Fen (y, _) -> Var.equal x y
   in
 
@@ -87,3 +128,14 @@ let pp_as_dot ~name fmt (es, c) =
         ())
     c;
   fpf fmt "}@]"
+
+let quantified_variables_set (xs, _) = xs
+let quantified_variables conj = Var.Set.to_seq (quantified_variables_set conj)
+
+let literals_set (_, ls) = ls
+let literals conj = Literal.Set.to_seq (literals_set conj)
+let literals_list conj = List.of_seq (literals conj)
+
+let from_sets xs ls = (xs, ls)
+
+let is_quantified x (xs, _) = Var.Set.mem x xs

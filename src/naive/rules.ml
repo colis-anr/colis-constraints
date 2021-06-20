@@ -51,6 +51,7 @@ let replace_in_atom ~var:x ~by:y = function
   | Eq (a, b) -> Eq ((if Var.equal a x then y else a), (if Var.equal b x then y else b))
   | Feat (a, f, b) -> Feat ((if Var.equal a x then y else a), f, (if Var.equal b x then y else b))
   | Abs (a, f) -> Abs ((if Var.equal a x then y else a), f)
+  | Maybe (a, f, b) -> Maybe ((if Var.equal a x then y else a), f, (if Var.equal b x then y else b))
   | Kind (a, k) -> Kind ((if Var.equal a x then y else a), k)
   | Fen (a, fs) -> Fen ((if Var.equal a x then y else a), fs)
   | Sim (a, fs, b) -> Sim ((if Var.equal a x then y else a), fs, (if Var.equal b x then y else b))
@@ -59,42 +60,44 @@ let replace_in_literal ~var ~by = function
   | Pos a -> Pos (replace_in_atom ~var ~by a)
   | Neg a -> Neg (replace_in_atom ~var ~by a)
 
-let replace_in_literal_set ~var ~by =
-  Literal.Set.map (replace_in_literal ~var ~by)
+let replace_in_literals ~var ~by =
+  Seq.map (replace_in_literal ~var ~by)
 
-let (&) l s = Literal.Set.add l s
+let (&) = Seq.cons
 
 let (x, y, z) = Metavar.fresh3 ()
 let f = Metavar.fresh ()
 let (fs, gs) = Metavar.fresh2 ()
 let (k, l) = Metavar.fresh2 ()
 
-let c_cycle (_, c) =
-  try ignore (accessibility c); None
-  with Invalid_argument _ -> Some []
+let c_cycle conj =
+  try ignore (accessibility (Conj.literals_set conj)); None
+  with Invalid_argument _ -> Some Disj.false_
 
 let make ~pat ?pred ~prod () =
-  fun (es, conj) ->
-  Pattern.find_all ?pred pat (es, conj)
+  fun conj ->
+  (* let es = Conj.quantified_variables_set conj in
+   * let conj = Conj.literals conj in *)
+  Pattern.find_all ?pred pat conj
   |> Seq.filter_map
-       (fun (a, conj') ->
-         (* The production rule gives us a disjunction. However,
-            sometimes, this conjunction might be equal to the given
-            one. In this case, we have to keep looking for an other
-            production rule that might be better. *)
-         match prod a conj' with
-         | [] -> Some []
-         | [conj'] when Conj.equal conj' (es, conj) -> None
-         | [conj'] -> Some [conj']
-         | disj' ->
-            assert (List.for_all (fun conj' -> not (Conj.equal conj' (es, conj))) disj');
-            Some disj')
+    (fun (a, conj') ->
+       (* The production rule gives us a disjunction. However,
+          sometimes, this conjunction might be equal to the given
+          one. In this case, we have to keep looking for an other
+          production rule that might be better. *)
+       match Disj.to_list (prod a conj') with
+       | [] -> Some Disj.false_
+       | [conj'] when Conj.equal conj' conj -> None
+       | [conj'] -> Some (Disj.singleton conj')
+       | disj' ->
+         assert (List.for_all (fun conj' -> not (Conj.equal conj' conj)) disj');
+         Some (Disj.from_list disj'))
   |> (fun seq -> seq ())
   |> function
-    | Nil -> None
-    | Cons (x, _) -> Some x
+  | Nil -> None
+  | Cons (x, _) -> Some x
 
-let clash _ _ = []
+let clash _ _ = Disj.false_
 
 let c_feat_abs =
   make
@@ -136,7 +139,7 @@ let s_eq_glob =
     ~pat:[Pos (Eq (x, y))]
     ~pred:(fun a _ ->
         not (Var.equal (Assign.var a x) (Assign.var a y)))
-    ~prod:(fun a (es, c) ->
+    ~prod:(fun a conj ->
         let x = Assign.var a x in
         let y = Assign.var a y in
         let (x, y) =
@@ -146,192 +149,247 @@ let s_eq_glob =
           | c when c > 0 -> (x, y)
           | _ -> assert false
         in
-        [es, Pos (Eq (x, y)) & replace_in_literal_set ~var:x ~by:y c])
+        conj
+        |> Conj.set_literals
+          (Pos (Eq (x, y)) & replace_in_literals ~var:x ~by:y (Conj.literals conj))
+        |> Disj.singleton)
     ()
 
 let s_eq =
   make
     ~pat:[Pos (Eq (x, y))]
-    ~pred:(fun a (es, _) ->
-      Var.Set.mem (Assign.var a x) es
-      && not (Var.equal (Assign.var a x) (Assign.var a y)))
-    ~prod:(fun a (es, c) ->
-      let x = Assign.var a x in
-      let y = Assign.var a y in
-      [Var.Set.remove x es, replace_in_literal_set ~var:x ~by:y c])
+    ~pred:(fun a conj ->
+        Var.Set.mem (Assign.var a x) (Conj.quantified_variables_set conj)
+        && not (Var.equal (Assign.var a x) (Assign.var a y)))
+    ~prod:(fun a conj ->
+        let x = Assign.var a x in
+        let y = Assign.var a y in
+        conj
+        |> Conj.unquantify x
+        |> Conj.set_literals
+          (conj
+           |> Conj.literals
+           |> replace_in_literals ~var:x ~by:y)
+        |> Disj.singleton)
     ()
 
 let s_eq_refl =
   make
     ~pat:[Pos (Eq (x, x))]
-    ~prod:(fun _ (es, c) -> [es, c])
+    ~prod:(fun _ conj -> Disj.singleton conj)
     ()
 
 let s_feats =
   make
     ~pat:[Pos (Feat (x, f, y)); Pos (Feat (x, f, z))]
-    ~pred:(fun a (es, _) ->
-      Var.Set.mem (Assign.var a z) es
-      && not (Var.equal (Assign.var a y) (Assign.var a z)))
-    ~prod:(fun a (es, c) ->
-      let x = Assign.var a x in
-      let y = Assign.var a y in
-      let z = Assign.var a z in
-      let f = Assign.feat a f in
-      [Var.Set.remove z es, Pos (Feat (x, f, y)) & replace_in_literal_set ~var:z ~by:y c])
+    ~pred:(fun a conj ->
+        Conj.is_quantified (Assign.var a z) conj
+        && not (Var.equal (Assign.var a y) (Assign.var a z)))
+    ~prod:(fun a conj ->
+        let x = Assign.var a x in
+        let y = Assign.var a y in
+        let z = Assign.var a z in
+        let f = Assign.feat a f in
+        conj
+        |> Conj.unquantify z
+        |> Conj.set_literals
+          (conj
+           |> Conj.literals
+           |> replace_in_literals ~var:z ~by:y
+           |> (&) (Pos (Feat (x, f, y))))
+        |> Disj.singleton)
     ()
 
 let s_feats_glob =
   make
     ~pat:[Pos (Feat (x, f, y)); Pos (Feat (x, f, z))]
-    ~pred:(fun a (es, _) ->
-      not (Var.Set.mem (Assign.var a y) es)
-      && not (Var.Set.mem (Assign.var a z) es))
-    ~prod:(fun a (es, c) ->
+    ~pred:(fun a conj ->
+      not (Conj.is_quantified (Assign.var a y) conj)
+      && not (Conj.is_quantified (Assign.var a z) conj))
+    ~prod:(fun a conj ->
       let x = Assign.var a x in
       let y = Assign.var a y in
       let z = Assign.var a z in
       let f = Assign.feat a f in
-      [es, Pos (Eq (y, z)) & Pos (Feat (x, f, y)) & c])
+      conj
+      |> Conj.add_literals_list
+        [ Pos (Eq (y, z)) ;
+          Pos (Feat (x, f, y)) ]
+      |> Disj.singleton)
     ()
 
 let s_sims =
   make
     ~pat:[Pos (Sim (x, fs, y)); Pos (Sim (x, gs, y))]
-    ~prod:(fun a (es, c) ->
-      let x = Assign.var a x in
-      let y = Assign.var a y in
-      let hs = Feat.Set.inter (Assign.feat_set a fs) (Assign.feat_set a gs) in
-      [es, Pos (Sim (x, hs, y)) & c])
+    ~prod:(fun a conj ->
+        let x = Assign.var a x in
+        let y = Assign.var a y in
+        let hs = Feat.Set.inter (Assign.feat_set a fs) (Assign.feat_set a gs) in
+        conj
+        |> Conj.add_literal (Pos (Sim (x, hs, y)))
+        |> Disj.singleton)
     ()
 
 let p_feat =
   make
     ~pat:[Pos (Sim (x, fs, y)); Pos (Feat (x, f, z))]
     ~pred:(fun a _ -> not (Feat.Set.mem (Assign.feat a f) (Assign.feat_set a fs)))
-    ~prod:(fun a (es, c) ->
-      let x = Assign.var a x in
-      let y = Assign.var a y in
-      let z = Assign.var a z in
-      let f = Assign.feat a f in
-      let fs = Assign.feat_set a fs in
-      [es, Pos (Sim (x, fs, y)) & Pos (Feat (x, f, z)) & Pos (Feat (y, f, z)) & c])
+    ~prod:(fun a conj ->
+        let x = Assign.var a x in
+        let y = Assign.var a y in
+        let z = Assign.var a z in
+        let f = Assign.feat a f in
+        let fs = Assign.feat_set a fs in
+        conj
+        |> Conj.add_literals_list
+          [Pos (Sim (x, fs, y));
+           Pos (Feat (x, f, z));
+           Pos (Feat (y, f, z))]
+        |> Disj.singleton)
     ()
 
 let p_abs =
   make
     ~pat:[Pos (Sim (x, fs, y)); Pos (Abs (x, f))]
     ~pred:(fun a _ -> not (Feat.Set.mem (Assign.feat a f) (Assign.feat_set a fs)))
-    ~prod:(fun a (es, c) ->
-      let x = Assign.var a x in
-      let y = Assign.var a y in
-      let f = Assign.feat a f in
-      let fs = Assign.feat_set a fs in
-      [es, Pos (Sim (x, fs, y)) & Pos (Abs (x, f)) & Pos (Abs (y, f)) & c])
+    ~prod:(fun a conj ->
+        let x = Assign.var a x in
+        let y = Assign.var a y in
+        let f = Assign.feat a f in
+        let fs = Assign.feat_set a fs in
+        conj
+        |> Conj.add_literals_list
+          [Pos (Sim (x, fs, y));
+           Pos (Abs (x, f));
+           Pos (Abs (y, f))]
+        |> Disj.singleton)
     ()
 
 let p_fen =
   make
     ~pat:[Pos (Sim (x, fs, y)); Pos (Fen (x, gs))]
-    ~prod:(fun a (es, c) ->
-      let x = Assign.var a x in
-      let y = Assign.var a y in
-      let fs = Assign.feat_set a fs in
-      let gs = Assign.feat_set a gs in
-      [es, Pos (Sim (x, fs, y)) & Pos (Fen (x, gs)) & Pos (Fen (y, Feat.Set.union fs gs)) & c])
+    ~prod:(fun a conj ->
+        let x = Assign.var a x in
+        let y = Assign.var a y in
+        let fs = Assign.feat_set a fs in
+        let gs = Assign.feat_set a gs in
+        conj
+        |> Conj.add_literals_list
+          [Pos (Sim (x, fs, y));
+           Pos (Fen (x, gs));
+           Pos (Fen (y, Feat.Set.union fs gs))]
+        |> Disj.singleton)
     ()
 
 let p_sim =
   make
     ~pat:[Pos (Sim (x, fs, y)); Pos (Sim (x, gs, z))]
-    ~pred:(fun a (_, c) ->
-      let fs = Assign.feat_set a fs in
-      let gs = Assign.feat_set a gs in
-      let fgs = Feat.Set.union fs gs in
-      (* This rule has a really heavy side-condition *)
-      let hs =
-        Literal.Set.fold
-          (fun l hs ->
-            match l with
-            | Pos (Sim (_, hs', _)) ->
-               Some (
+    ~pred:(fun a conj ->
+        let fs = Assign.feat_set a fs in
+        let gs = Assign.feat_set a gs in
+        let fgs = Feat.Set.union fs gs in
+        (* This rule has a really heavy side-condition *)
+        let hs =
+          Seq.fold_left
+            (fun hs l ->
+               match l with
+               | Pos (Sim (_, hs', _)) ->
+                 Some (
                    match hs with
                    | None -> hs'
                    | Some hs -> Feat.Set.inter hs hs'
                  )
-            | _ -> hs)
-          c
-          None
-      in
-      match hs with
-      | None -> true
-      | Some hs -> not (Feat.Set.subset hs fgs))
-    ~prod:(fun a (es, c) ->
-      let x = Assign.var a x in
-      let y = Assign.var a y in
-      let z = Assign.var a z in
-      let fs = Assign.feat_set a fs in
-      let gs = Assign.feat_set a gs in
-      let fgs = Feat.Set.union fs gs in
-      [es, Pos (Sim (x, fs, y)) & Pos (Sim (x, gs, z)) & Pos (Sim (y, fgs, z)) & c])
+               | _ -> hs)
+            None
+            (Conj.literals conj)
+        in
+        match hs with
+        | None -> true
+        | Some hs -> not (Feat.Set.subset hs fgs))
+    ~prod:(fun a conj ->
+        let x = Assign.var a x in
+        let y = Assign.var a y in
+        let z = Assign.var a z in
+        let fs = Assign.feat_set a fs in
+        let gs = Assign.feat_set a gs in
+        let fgs = Feat.Set.union fs gs in
+        conj
+        |> Conj.add_literals_list
+          [ Pos (Sim (x, fs, y));
+            Pos (Sim (x, gs, z));
+            Pos (Sim (y, fgs, z)) ]
+        |> Disj.singleton)
     ()
 
 let r_neq =
   make
     ~pat:[Neg (Eq (x, y))]
-    ~prod:(fun a (es, c) ->
-      let x = Assign.var a x in
-      let y = Assign.var a y in
-      [es, Neg (Sim (x, Feat.Set.empty, y)) & c])
+    ~prod:(fun a conj ->
+        let x = Assign.var a x in
+        let y = Assign.var a y in
+        conj
+        |> Conj.add_literal
+          (Neg (Sim (x, Feat.Set.empty, y)))
+        |> Disj.singleton)
     ()
 
 let r_nfeat =
   make
     ~pat:[Neg (Feat (x, f, y))]
-    ~prod:(fun a (es, c) ->
-      let x = Assign.var a x in
-      let y = Assign.var a y in
-      let f = Assign.feat a f in
-      [
-        (es, Pos (Abs (x, f)) & c);
-        let z = Var.fresh () in
-        (Var.Set.add z es, Pos (Feat (x, f, z)) & Neg (Sim (y, Feat.Set.empty, z)) & c)
-      ]
-    )
+    ~prod:(fun a conj ->
+        let x = Assign.var a x in
+        let y = Assign.var a y in
+        let f = Assign.feat a f in
+        Disj.two
+          (Conj.add_literal (Pos (Abs (x, f))) conj)
+          (let z = Var.fresh () in
+           conj
+           |> Conj.quantify z
+           |> Conj.add_literals_list
+             [ Pos (Feat (x, f, z));
+               Neg (Sim (y, Feat.Set.empty, z)) ])
+      )
     ()
 
 let r_nkind =
   make
     ~pat:[Neg (Kind (x, k))]
-    ~prod:(fun a (es, c) ->
-      let x = Assign.var a x in
-      let k = Assign.kind a k in
-      Kind.all
-      |> List.filter ((<>) k)
-      |> List.map
-           (fun k ->
-             (es, Pos (Kind (x, k)) & c))
-    )
+    ~prod:(fun a conj ->
+        let x = Assign.var a x in
+        let k = Assign.kind a k in
+        Kind.all
+        |> List.filter ((<>) k)
+        |> List.map
+          (fun k ->
+             Conj.add_literal (Pos (Kind (x, k))) conj)
+        |> Disj.from_list
+      )
     ()
 
 let r_nabs =
   make
     ~pat:[Neg (Abs (x, f))]
-    ~prod:(fun a (es, c) ->
-      let x = Assign.var a x in
-      let f = Assign.feat a f in
-      let z = Var.fresh () in
-      [Var.Set.add z es, Pos (Feat (x, f, z)) & c])
+    ~prod:(fun a conj ->
+        let x = Assign.var a x in
+        let f = Assign.feat a f in
+        let z = Var.fresh () in
+        conj
+        |> Conj.quantify z
+        |> Conj.add_literal (Pos (Feat (x, f, z)))
+        |> Disj.singleton)
     ()
 
-let one_feature_in x fs es c =
+let one_feature_in x fs conj =
   Feat.Set.elements fs
   |> List.map
-       (fun f ->
-         let z = Var.fresh () in
-         (Var.Set.add z es, Pos (Feat (x, f, z)) & c))
+    (fun f ->
+       let z = Var.fresh () in
+       conj
+       |> Conj.quantify z
+       |> Conj.add_literal (Pos (Feat (x, f, z))))
+  |> Disj.from_list
 
-let one_difference_in x y fs es c =
+let one_difference_in x y fs conj =
   let difference_in x y f es c =
     let z = Var.fresh () in
     let z' = Var.fresh () in
@@ -341,115 +399,137 @@ let one_difference_in x y fs es c =
   in
   Feat.Set.elements fs
   |> List.map
-       (fun f ->
-         difference_in x y f es c)
+    (fun f ->
+       difference_in x y f
+         (Conj.quantified_variables_set conj)
+         (Conj.literals conj))
   |> List.flatten
+  |> List.map (fun (es, c) -> Conj.from_sets es (Literal.Set.of_seq c))
+  |> Disj.from_list
 
 let r_nfen_fen =
   make
     ~pat:[Pos (Fen (x, fs)); Neg (Fen (x, gs))]
-    ~prod:(fun a (es, c) ->
-      let x = Assign.var a x in
-      let fs = Assign.feat_set a fs in
-      let gs = Assign.feat_set a gs in
-      one_feature_in
-        x (Feat.Set.diff fs gs)
-        es (Pos (Fen (x, fs)) & c)
-    )
+    ~prod:(fun a conj ->
+        let x = Assign.var a x in
+        let fs = Assign.feat_set a fs in
+        let gs = Assign.feat_set a gs in
+        one_feature_in
+          x (Feat.Set.diff fs gs)
+          (Conj.add_literal (Pos (Fen (x, fs))) conj))
     ()
 
 let r_nsim_sim =
   make
     ~pat:[Pos (Sim (x, fs, y)); Neg (Sim (x, gs, y))]
-    ~prod:(fun a (es, c) ->
-      let x = Assign.var a x in
-      let y = Assign.var a y in
-      let fs = Assign.feat_set a fs in
-      let gs = Assign.feat_set a gs in
-      one_difference_in
-        x y (Feat.Set.diff fs gs)
-        es (Pos (Sim (x, fs, y)) & c)
-    )
+    ~prod:(fun a conj ->
+        let x = Assign.var a x in
+        let y = Assign.var a y in
+        let fs = Assign.feat_set a fs in
+        let gs = Assign.feat_set a gs in
+        one_difference_in
+          x y (Feat.Set.diff fs gs)
+          (Conj.add_literal (Pos (Sim (x, fs, y))) conj))
     ()
 
 let r_nsim_fen =
   make
     ~pat:[Pos (Fen (x, fs)); Neg (Sim (x, gs, y))]
-    ~prod:(fun a (es, c) ->
-      let x = Assign.var a x in
-      let y = Assign.var a y in
-      let fs = Assign.feat_set a fs in
-      let gs = Assign.feat_set a gs in
-      let c = Pos (Fen (x, fs)) & c in
-      (es, Neg (Fen (y, Feat.Set.union fs gs)) & c)
-      :: one_difference_in x y (Feat.Set.diff fs gs) es c
-    )
+    ~prod:(fun a conj ->
+        let x = Assign.var a x in
+        let y = Assign.var a y in
+        let fs = Assign.feat_set a fs in
+        let gs = Assign.feat_set a gs in
+        let conj = Conj.add_literal (Pos (Fen (x, fs))) conj in
+        Disj.or_
+          (conj
+           |> Conj.add_literal (Neg (Fen (y, Feat.Set.union fs gs)))
+           |> Disj.singleton)
+          (one_difference_in x y (Feat.Set.diff fs gs) conj))
     ()
 
 let e_nfen =
   make
     ~pat:Pattern.[Pos (Sim (x, fs, y)); Neg (Fen (x, gs))]
     ~pred:(fun a _ -> not (Feat.Set.subset (Assign.feat_set a fs) (Assign.feat_set a gs)))
-    ~prod:(fun a (es, c) ->
-      let x = Assign.var a x in
-      let y = Assign.var a y in
-      let fs = Assign.feat_set a fs in
-      let gs = Assign.feat_set a gs in
-      let c = Pos (Sim (x, fs, y)) & c in
-      (es, Neg (Fen (x, Feat.Set.union fs gs)) & c)
-      :: one_feature_in x (Feat.Set.diff fs gs) es c
-    )
+    ~prod:(fun a conj ->
+        let x = Assign.var a x in
+        let y = Assign.var a y in
+        let fs = Assign.feat_set a fs in
+        let gs = Assign.feat_set a gs in
+        let conj = Conj.add_literal (Pos (Sim (x, fs, y))) conj in
+        Disj.or_
+          (conj
+           |> Conj.add_literal (Neg (Fen (x, Feat.Set.union fs gs)))
+           |> Disj.singleton)
+          (one_feature_in x (Feat.Set.diff fs gs) conj))
     ()
 
 let e_nsim =
   make
     ~pat:[Pos (Sim (x, fs, y)); Neg (Sim (x, gs, z))]
     ~pred:(fun a _ -> not (Feat.Set.subset (Assign.feat_set a fs) (Assign.feat_set a gs)))
-    ~prod:(fun a (es, c) ->
-      let x = Assign.var a x in
-      let y = Assign.var a y in
-      let z = Assign.var a z in
-      let fs = Assign.feat_set a fs in
-      let gs = Assign.feat_set a gs in
-      let c = Pos (Sim (x, fs, y)) & c in
-      (es, Neg (Sim (x, Feat.Set.union fs gs, z)) & c)
-      :: one_difference_in x z (Feat.Set.diff fs gs) es c
-    )
+    ~prod:(fun a conj ->
+        let x = Assign.var a x in
+        let y = Assign.var a y in
+        let z = Assign.var a z in
+        let fs = Assign.feat_set a fs in
+        let gs = Assign.feat_set a gs in
+        let conj = Conj.add_literal (Pos (Sim (x, fs, y))) conj in
+        Disj.or_
+          (conj
+           |> Conj.add_literal (Neg (Sim (x, Feat.Set.union fs gs, z)))
+           |> Disj.singleton)
+          (one_difference_in x z (Feat.Set.diff fs gs) conj))
     ()
 
 let p_nfen =
   make
     ~pat:[Pos (Sim (x, fs, y)); Neg (Fen (x, gs))]
     ~pred:(fun a _ -> Feat.Set.subset (Assign.feat_set a fs) (Assign.feat_set a gs))
-    ~prod:(fun a (es, c) ->
-      let x = Assign.var a x in
-      let y = Assign.var a y in
-      let fs = Assign.feat_set a fs in
-      let gs = Assign.feat_set a gs in
-      [es, Pos (Sim (x, fs, y)) & Neg (Fen (x, gs)) & Neg (Fen (y, gs)) & c])
+    ~prod:(fun a conj ->
+        let x = Assign.var a x in
+        let y = Assign.var a y in
+        let fs = Assign.feat_set a fs in
+        let gs = Assign.feat_set a gs in
+        conj
+        |> Conj.add_literals_list
+          [ Pos (Sim (x, fs, y));
+            Neg (Fen (x, gs));
+            Neg (Fen (y, gs)) ]
+        |> Disj.singleton)
     ()
 
 let p_nsim =
   make
     ~pat:[Pos (Sim (x, fs, y)); Neg (Sim (x, gs, z))]
     ~pred:(fun a _ -> Feat.Set.subset (Assign.feat_set a fs) (Assign.feat_set a gs))
-    ~prod:(fun a (es, c) ->
-      let x = Assign.var a x in
-      let y = Assign.var a y in
-      let z = Assign.var a z in
-      let fs = Assign.feat_set a fs in
-      let gs = Assign.feat_set a gs in
-      [es, Pos (Sim (x, fs, y)) & Neg (Sim (x, gs, z)) & Neg (Sim (y, gs, z)) & c])
+    ~prod:(fun a conj ->
+        let x = Assign.var a x in
+        let y = Assign.var a y in
+        let z = Assign.var a z in
+        let fs = Assign.feat_set a fs in
+        let gs = Assign.feat_set a gs in
+        conj
+        |> Conj.add_literals_list
+          [ Pos (Sim (x, fs, y));
+            Neg (Sim (x, gs, z));
+            Neg (Sim (y, gs, z)) ]
+        |> Disj.singleton)
     ()
 
 let s_kind =
   make
     ~pat:[Pos (Kind (x, k))]
     ~pred:(fun a _ -> Assign.kind a k <> Dir)
-    ~prod:(fun a (es, c) ->
-      let x = Assign.var a x in
-      let k = Assign.kind a k in
-      [es, Pos (Fen (x, Feat.Set.empty)) & Pos (Kind (x, k)) & c])
+    ~prod:(fun a conj ->
+        let x = Assign.var a x in
+        let k = Assign.kind a k in
+        conj
+        |> Conj.add_literals_list
+          [ Pos (Fen (x, Feat.Set.empty));
+            Pos (Kind (x, k))]
+        |> Disj.singleton)
     ()
 
 (* ========================================================================== *)

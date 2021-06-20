@@ -7,129 +7,62 @@ let with_internal_2 x y f =
   with_internal y @@ fun y ->
   f x y
 
-let check_if_need_to_stop () =
-  Colis_constraints_common.Limits.check_cpu_time_limit ();
-  Colis_constraints_common.Limits.check_memory_limit ()
-
-open Internal
-
-let eq x y =
-  check_if_need_to_stop ();
-  with_internal_2 x y @@ fun x y ->
-  eq x y
-
-let neq x y =
-  check_if_need_to_stop ();
-  with_internal_2 x y @@ fun x y ->
-  neq x y
-
-let feat x f y =
-  check_if_need_to_stop ();
-  with_internal_2 x y @@ fun x y ->
-  feat x f y
-
-let nfeat x f y =
-  check_if_need_to_stop ();
-  with_internal_2 x y @@ fun x y ->
-  nfeat x f y
-
-let abs x f =
-  check_if_need_to_stop ();
-  with_internal x @@ fun x ->
-  abs x f
-
-let nabs x f =
-  check_if_need_to_stop ();
-  with_internal x @@ fun x ->
-  nabs x f
-
-let maybe x f y =
-  check_if_need_to_stop ();
-  with_internal_2 x y @@ fun x y ->
-  maybe x f y
-
-let nmaybe x f y =
-  check_if_need_to_stop ();
-  with_internal_2 x y @@ fun x y ->
-  nmaybe x f y
-
-let fen x fs =
-  check_if_need_to_stop ();
-  with_internal x @@ fun x ->
-  fen x fs
-
-let nfen _x _fs =
-  check_if_need_to_stop ();
-  Core.not_implemented "nfen"
-
-let sim x fs y =
-  check_if_need_to_stop ();
-  with_internal_2 x y @@ fun x y ->
-  sim x fs y
-
-let nsim _x _fs _y =
-  check_if_need_to_stop ();
-  Core.not_implemented "nsim"
-
-let kind x k =
-  check_if_need_to_stop ();
-  with_internal x @@ fun x ->
-  kind x k
-
-let nkind x k =
-  check_if_need_to_stop ();
-  with_internal x @@ fun x ->
-  nkind x k
-
-let  reg x =  kind x Colis_constraints_common.Kind.Reg
-let nreg x = nkind x Colis_constraints_common.Kind.Reg
-let  dir x =  kind x Colis_constraints_common.Kind.Dir
-let ndir x = nkind x Colis_constraints_common.Kind.Dir
-let  block x =  kind x Colis_constraints_common.Kind.Block
-let nblock x = nkind x Colis_constraints_common.Kind.Block
-let  sock x =  kind x Colis_constraints_common.Kind.Sock
-let nsock x = nkind x Colis_constraints_common.Kind.Sock
-let  pipe x =  kind x Colis_constraints_common.Kind.Pipe
-let npipe x = nkind x Colis_constraints_common.Kind.Pipe
-let  char x =  kind x Colis_constraints_common.Kind.Char
-let nchar x = nkind x Colis_constraints_common.Kind.Char
-let  symlink x =  kind x Colis_constraints_common.Kind.Symlink
-let nsymlink x = nkind x Colis_constraints_common.Kind.Symlink
-
-let resolve r cwd p z =
-  check_if_need_to_stop ();
-  with_internal_2 r z @@ fun r z ->
-  resolve r [] (Colis_constraints_common.Path.concat cwd p) z
-
-let noresolve r cwd p =
-  check_if_need_to_stop ();
-  with_internal r @@ fun r ->
-  noresolve r [] (Colis_constraints_common.Path.concat cwd p)
-
-let maybe_resolve r cwd p z =
-  check_if_need_to_stop ();
-  with_internal_2 r z @@ fun r z ->
-  maybe_resolve r [] (Colis_constraints_common.Path.concat cwd p) z
-
-let similar r r' cwd q z z' =
-  check_if_need_to_stop ();
-  with_internal_2 r r' @@ fun r r' ->
-  with_internal_2 z z' @@ fun z z' ->
-  similar r r' Colis_constraints_common.Path.(normalize ~cwd q) z z'
-
-let literal =
+let literal lit =
   let open Colis_constraints_common in
   let open Atom in let open Literal in
-  function
-  | Pos (Eq (x, y)) -> eq x y
-  | Pos (Feat (x, f, y)) -> feat x f y
-  | Pos (Abs (x, f)) -> abs x f
-  | Pos (Kind (x, k)) -> kind x k
-  | Pos (Fen (x, fs)) -> fen x fs
-  | Pos (Sim (x, fs, y)) -> sim x fs y
-  | Neg (Eq (x, y)) -> neq x y
-  | Neg (Feat (x, f, y)) -> nfeat x f y
-  | Neg (Abs (x, f)) -> nabs x f
-  | Neg (Kind (x, k)) -> nkind x k
-  | Neg (Fen (x, fs)) -> nfen x fs
-  | Neg (Sim (x, fs, y)) -> nsim x fs y
+  Colis_constraints_common.Limits.check_cpu_time_limit ();
+  Colis_constraints_common.Limits.check_memory_limit ();
+  match lit with
+  | Pos (Eq (x, y)) ->
+    with_internal_2 x y @@ fun x y ->
+    Internal.eq x y
+
+  | Pos (Feat (x, f, y)) ->
+    with_internal_2 x y @@ fun x y ->
+    Internal.feat x f y
+
+  | Pos (Abs (x, f)) ->
+    with_internal x @@ fun x ->
+    Internal.abs x f
+
+  | Pos (Maybe (x, f, y)) ->
+    with_internal_2 x y @@ fun x y ->
+    Internal.maybe x f y
+
+  | Pos (Kind (x, k)) ->
+    with_internal x @@ fun x ->
+    Internal.kind x k
+
+  | Pos (Fen (x, fs)) ->
+    with_internal x @@ fun x ->
+    Internal.fen x fs
+
+  | Pos (Sim (x, fs, y)) ->
+    with_internal_2 x y @@ fun x y ->
+    Internal.sim x fs y
+
+  | Neg (Eq (x, y)) ->
+    with_internal x @@ fun x ->
+    Internal.neq x y
+
+  | Neg (Feat (x, f, y)) ->
+    with_internal x @@ fun x ->
+    Internal.nfeat x f y
+
+  | Neg (Abs (x, f)) ->
+    with_internal x @@ fun x ->
+    Internal.nabs x f
+
+  | Neg (Maybe (x, f, y)) ->
+    with_internal_2 x y @@ fun x y ->
+    Internal.nmaybe x f y
+
+  | Neg (Kind (x, k)) ->
+    with_internal x @@ fun x ->
+    Internal.nkind x k
+
+  | Neg (Fen (_x, _fs)) ->
+    Core.not_implemented "nfen"
+
+  | Neg (Sim (_x, _fs, _y)) ->
+    Core.not_implemented "nsim"

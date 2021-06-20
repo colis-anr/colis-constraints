@@ -4,10 +4,20 @@ type t =
   | Eq of Var.t * Var.t
   | Feat of Var.t * Feat.t * Var.t
   | Abs of Var.t * Feat.t
+  | Maybe of Var.t * Feat.t * Var.t (* Feat or Abs *)
   | Kind of Var.t * Kind.t
   | Fen of Var.t * (Feat.Set.t [@printer pp_feat_set])
   | Sim of Var.t * (Feat.Set.t [@printer pp_feat_set]) * Var.t
 [@@deriving ord]
+
+let rewrite_variables s = function
+  | Eq (x, y) -> Eq (s x, s y)
+  | Feat (x, f, y) -> Feat (s x, f, s y)
+  | Abs (x, f) -> Abs (s x, f)
+  | Maybe (x, f, y) -> Maybe (s x, f, s y)
+  | Kind (x, k) -> Kind (s x, k)
+  | Fen (x, fs) -> Fen (s x, fs)
+  | Sim (x, fs, y) -> Sim (s x, fs, s y)
 
 let compare_unordered_pair comp (x1, y1) (x2, y2) =
   let (x1, y1) =
@@ -49,6 +59,8 @@ let pp fmt = function
      fpf fmt "%a[%a]%a" Var.pp x Feat.pp f Var.pp y
   | Abs (x, f) ->
      fpf fmt "%a[%a]↑" Var.pp x Feat.pp f
+  | Maybe (x, f, y) ->
+     fpf fmt "%a[%a]%a?" Var.pp x Feat.pp f Var.pp y
   | Kind (x, k) ->
      fpf fmt "%a(%a)" Kind.pp k Var.pp x
   | Fen (x, fs) ->
@@ -58,4 +70,4 @@ let pp fmt = function
 
 let vars = function
   | Abs (x, _) | Kind (x, _) | Fen (x, _) -> Var.Set.singleton x
-  | Eq (x, y) | Feat (x, _, y) | Sim (x, _, y) -> Var.Set.(add x (singleton y))
+  | Eq (x, y) | Feat (x, _, y) | Maybe (x, _, y) | Sim (x, _, y) -> Var.Set.(add x (singleton y))

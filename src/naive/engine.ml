@@ -5,21 +5,20 @@ let (f, g) = Metavar.fresh2 ()
 let (fs, gs) = Metavar.fresh2 ()
 
 let apply_rule_on_disj (name, rule) disj =
-  let disj' = List.map rule disj in
-  if List.exists ((<>) None) disj' then
-    (
-      Log.debug (fun m -> m "Rule %s applied" name);
-      Some
-        (List.map2
-           (fun conj conj' ->
-             match conj' with
-             | None -> [conj]
-             | Some disj' -> disj')
-           disj disj'
-         |> List.flatten)
-    )
-  else
-    None
+  let applied = ref false in
+  let apply_rule_on_conj rule conj =
+    match rule conj with
+    | None -> Disj.singleton conj
+    | Some disj' ->
+      if not !applied then
+        (
+          Log.debug (fun m -> m "Rule %s applied" name);
+          applied := true
+        );
+      disj'
+  in
+  let disj' = Disj.concat_map (apply_rule_on_conj rule) disj in
+  if !applied then Some disj' else None
 
 let rec apply_rules_on_disj rules disj =
   match rules with
@@ -32,7 +31,7 @@ let rec apply_rules_on_disj rules disj =
 let is_atom_about xs = function
   | Atom.Abs (a, _) | Kind (a, _) | Fen (a, _) ->
      Var.Set.mem a xs
-  | Eq (a, b) | Feat (a, _, b) | Sim (a, _, b) ->
+  | Eq (a, b) | Feat (a, _, b) | Maybe (a, _, b) | Sim (a, _, b) ->
      Var.Set.mem a xs || Var.Set.mem b xs
 
 let is_literal_about xs = function
@@ -61,21 +60,25 @@ let simplify (disj : Disj.t) : Disj.t =
   Limits.check_cpu_time_limit ();
   Limits.check_memory_limit ();
   let disj' =
-    List.map
-      (fun (es, c) ->
-        let xs =
-          Rules.accessibility c
-          |> List.filter (fun (x, ys) ->
-                 Var.Set.mem x es && Var.Set.subset ys es)
-          |> List.map (fun (x, _) -> x)
-          |> Var.Set.of_list
-        in
-        (Var.Set.diff es xs, remove_literals_about_in_literal_set xs c))
+    Disj.map
+      (fun conj ->
+         let es = Conj.quantified_variables_set conj in
+         let c = Conj.literals_set conj in
+         let xs =
+           Rules.accessibility c
+           |> List.filter (fun (x, ys) ->
+               Var.Set.mem x es && Var.Set.subset ys es)
+           |> List.map (fun (x, _) -> x)
+           |> Var.Set.of_list
+         in
+         Conj.from_sets
+           (Var.Set.diff es xs)
+           (remove_literals_about_in_literal_set xs c))
       disj
   in
   Log.debug (fun m -> m "%a" Disj.pp disj');
-  List.iter
+  Disj.to_seq disj'
+  |> Seq.iter
     (fun conj' ->
-      Log.debug (fun m -> m "%a" (Conj.pp_as_dot ~name:"sdlkfj") conj'))
-    disj';
+       Log.debug (fun m -> m "%a" (Conj.pp_as_dot ~name:"sdlkfj") conj'));
   disj'
