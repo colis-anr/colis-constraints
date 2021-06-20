@@ -498,8 +498,6 @@ let to_literals c =
         y
   in
 
-  (* FIXME: unfold maybes *)
-
   iter_infos
     (fun x info_x ->
        Info.iter_feats
@@ -514,6 +512,11 @@ let to_literals c =
                 ys
          )
          info_x;
+
+       (match info_x.kind with
+        | Any -> ()
+        | Neg ks -> List.iter (fun k -> add_literal (Neg (Kind (var x, k)))) ks
+        | Pos k -> add_literal (Pos (Kind (var x, k))));
 
        let () =
          match Info.get_fen info_x with
