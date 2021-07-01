@@ -97,7 +97,7 @@ let normalize ?(cwd=[]) p =
   in
   match p with
   | Abs p -> normalize [] p
-  | Rel p -> normalize cwd p
+  | Rel p -> normalize (List.rev cwd) p
 
 let rec check_normal_rel = function
   | [] -> []
