@@ -57,7 +57,7 @@ let strip_trailing_slashes s =
           | "" :: sl' -> remove_empty sl'
           | _ -> sl
    in
-   String.concat (String.make 1 '/') (List.rev (remove_empty sl)) 
+   String.concat (String.make 1 '/') (List.rev (remove_empty (List.rev sl))) 
 
 let rel_to_string ?(abs=false) r =
   List.map comp_to_string r
