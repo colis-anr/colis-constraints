@@ -1,7 +1,7 @@
 open Batteries
 open Colis_constraints_common
 
-type sat_conj
+type sat_conj [@@deriving yojson]
 (** Type of satisfiable conjunctions. The interface guarantees that all objects
     of this type are satisfiable. *)
 
